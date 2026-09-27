@@ -153,10 +153,10 @@ def ensure_jwt_token_sync(region):
             "BD": "https://ff-jwt-mocha.vercel.app/token?uid=7871185725&password=ORIGIN-RXSWASO1W-PANKAJ",
             "ID": "https://ff-jwt-mocha.vercel.app/token?uid=7898209388&password=error_PPA8W_BY_DIVAN_SINGH_2Z77X",
             "PK": "https://ff-jwt-mocha.vercel.app/token?uid=7898223495&password=error_CJO0M_BY_DIVAN_SINGH_2JDZX",
-            "VN": "https://jwt-phi-ten.vercel.app/token?uid=6994726488&password=1_JAHID_X_EMPIRE_yLAicWRP",
-            "ME": "https://jwt-phi-ten.vercel.app/token?uid=6994726488&password=1_JAHID_X_EMPIRE_yLAicWRP",
-            "TH": "https://jwt-phi-ten.vercel.app/token?uid=6994726488&password=1_JAHID_X_EMPIRE_yLAicWRP",
-            "default": "https://jwt-phi-ten.vercel.app/token?uid=6994726488&password=1_JAHID_X_EMPIRE_yLAicWRP"
+            "VN": "https://ff-jwt-mocha.vercel.app/token?uid={uid}&password={password}",
+            "ME": "https://ff-jwt-mocha.vercel.app/token?uid={uid}&password={password}",
+            "TH": "https://ff-jwt-mocha.vercel.app/token?uid={uid}&password={password}",
+            "default": "https://ff-jwt-mocha.vercel.app/token?uid={uid}&password={password}"
         }
 
         url = endpoints.get(region, endpoints["default"])
