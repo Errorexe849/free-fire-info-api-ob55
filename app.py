@@ -29,15 +29,16 @@ jwt_lock = threading.Lock()
 def create_http_session():
     session = requests.Session()
     retry = Retry(
-        total=3,
-        backoff_factor=0.5,
+        total=4,
+        backoff_factor=1.5,
         status_forcelist=[500, 502, 503, 504],
-        allowed_methods=["GET", "POST"]
+        allowed_methods=["GET", "POST"],
+        raise_on_status=False
     )
     adapter = HTTPAdapter(max_retries=retry, pool_connections=20, pool_maxsize=20)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
-    session.timeout = (5, 10)  # connect timeout, read timeout
+    session.timeout = (5, 12)  # connect timeout, read timeout
     return session
 
 http_session = create_http_session()
@@ -153,10 +154,10 @@ def ensure_jwt_token_sync(region):
             "BD": "https://ff-jwt-mocha.vercel.app/token?uid=7871185725&password=ORIGIN-RXSWASO1W-PANKAJ",
             "ID": "https://ff-jwt-mocha.vercel.app/token?uid=7898209388&password=error_PPA8W_BY_DIVAN_SINGH_2Z77X",
             "PK": "https://ff-jwt-mocha.vercel.app/token?uid=7898223495&password=error_CJO0M_BY_DIVAN_SINGH_2JDZX",
-            "VN": "https://ff-jwt-mocha.vercel.app/token?uid={uid}&password={password}",
-            "ME": "https://ff-jwt-mocha.vercel.app/token?uid={uid}&password={password}",
-            "TH": "https://ff-jwt-mocha.vercel.app/token?uid={uid}&password={password}",
-            "default": "https://ff-jwt-mocha.vercel.app/token?uid={uid}&password={password}"
+            "VN": "https://jwt-phi-ten.vercel.app/token?uid=6994726488&password=1_JAHID_X_EMPIRE_yLAicWRP",
+            "ME": "https://jwt-phi-ten.vercel.app/token?uid=6994726488&password=1_JAHID_X_EMPIRE_yLAicWRP",
+            "TH": "https://jwt-phi-ten.vercel.app/token?uid=6994726488&password=1_JAHID_X_EMPIRE_yLAicWRP",
+            "default": "https://jwt-phi-ten.vercel.app/token?uid=6994726488&password=1_JAHID_X_EMPIRE_yLAicWRP"
         }
 
         url = endpoints.get(region, endpoints["default"])
@@ -181,8 +182,8 @@ def ensure_jwt_token_sync(region):
     return jwt_tokens.get(region)
 
 
-def get_api_endpoint(region):
-    endpoints = {
+def get_api_endpoints(region):
+    primary = {
         "IND": "https://client.ind.freefiremobile.com/GetPlayerPersonalShow",
         "BR": "https://client.us.freefiremobile.com/GetPlayerPersonalShow",
         "US": "https://client.us.freefiremobile.com/GetPlayerPersonalShow",
@@ -195,7 +196,16 @@ def get_api_endpoint(region):
         "TH": "https://clientbp.ggpolarbear.com/GetPlayerPersonalShow",
         "default": "https://clientbp.ggpolarbear.com/GetPlayerPersonalShow"
     }
-    return endpoints.get(region, endpoints["default"])
+    
+    main_url = primary.get(region, primary["default"])
+    fallbacks = [
+        main_url,
+        "https://client.us.freefiremobile.com/GetPlayerPersonalShow",
+        "https://client.ind.freefiremobile.com/GetPlayerPersonalShow"
+    ]
+    # Deduplicate preserving order
+    seen = set()
+    return [url for url in fallbacks if not (url in seen or seen.add(url))]
 
 default_key = "Yg&tc%DEuh6%Zc^8"
 default_iv = "6oyZDr22E3ychjM%"
@@ -213,7 +223,7 @@ def apis(idd, region):
     if not token:
         raise Exception(f"Failed to get JWT token for region {region}")
     
-    endpoint = get_api_endpoint(region)
+    endpoints = get_api_endpoints(region)
     headers = {
         'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 9; ASUS_Z01QD Build/PI)',
         'Connection': 'Keep-Alive',
@@ -221,18 +231,26 @@ def apis(idd, region):
         'Authorization': f'Bearer {token}',
         'X-Unity-Version': '2018.4.11f1',
         'X-GA': 'v1 1',
-        'ReleaseVersion': 'OB54',
+        'ReleaseVersion': 'OB55',
         'Content-Type': 'application/x-www-form-urlencoded',
     }
     
-    try:
-        data = bytes.fromhex(idd)
-        response = http_session.post(endpoint, headers=headers, data=data, timeout=10)
-        response.raise_for_status()
-        return response.content.hex()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"[API] Request to {endpoint} failed: {e}")
-        raise
+    data = bytes.fromhex(idd)
+    last_exception = None
+
+    for endpoint in endpoints:
+        try:
+            response = http_session.post(endpoint, headers=headers, data=data, timeout=10)
+            if response.status_code == 200:
+                return response.content.hex()
+            logger.warning(f"[API] Endpoint {endpoint} returned status {response.status_code}. Trying fallback...")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"[API] Request to {endpoint} failed: {e}")
+            last_exception = e
+
+    if last_exception:
+        raise last_exception
+    raise Exception("All game server endpoints failed to respond with HTTP 200")
 
 # ------------------ Flask Routes ------------------
 @app.route('/', methods=['GET'])
@@ -502,7 +520,7 @@ def get_wishlist_info():
             'Authorization': f'Bearer {token}',
             'X-Unity-Version': '2018.4.11f1',
             'X-GA': 'v1 1',
-            'ReleaseVersion': 'OB54',
+            'ReleaseVersion': 'OB55',
             'Content-Type': 'application/x-www-form-urlencoded',
         }
 
